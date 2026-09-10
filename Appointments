@@ -40,3 +40,20 @@ AND FROZENYN = 'Y'
   AND COALESCE(APPOINTMENTCANCELREASON,'') <> 'SCHEDULING ERROR'
   AND PATIENTID NOT IN (SELECT patient_id FROM reporting_tng.REGISTRATION WHERE last_name = 'TESTPATIENT');
 
+
+--  visit type wise counts
+select count(distinct appointmentid),visit_type_grouped from reporting_tng.provider_utilization 
+where PATIENTID IS NOT NULL
+  AND APPOINTMENTID IS NOT NULL
+  AND COALESCE(APPOINTMENTCANCELREASON,'') <> 'SCHEDULING ERROR'
+  AND PATIENTID NOT IN (SELECT patient_id FROM reporting_tng.REGISTRATION WHERE last_name = 'TESTPATIENT')
+  group by visit_type_grouped;
+
+-- cancellation reason by type counts
+select count(distinct appointmentid),APPOINTMENTCANCELREASON from reporting_tng.provider_utilization 
+where PATIENTID IS NOT NULL
+  AND APPOINTMENTID IS NOT NULL
+  AND COALESCE(APPOINTMENTCANCELREASON,'') <> 'SCHEDULING ERROR'
+  AND PATIENTID NOT IN (SELECT patient_id FROM reporting_tng.REGISTRATION WHERE last_name = 'TESTPATIENT')
+  group by APPOINTMENTCANCELREASON;
+
