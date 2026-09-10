@@ -1,0 +1,371 @@
+-- TOTAL PATIENTS
+SELECT count(DISTINCT patient_id) FROM reporting_tncpa.registration
+WHERE registration_date >= '2024-01-01'and registration_date < '2026-12-31' AND 
+patient_activeflag = 'Y';
+
+
+SELECT count(DISTINCT patient_id) FROM reporting_tncpa.registration
+where patient_activeflag = 'N';
+
+-- PENDING
+SELECT count(patient_id) FROM reporting_tncpa.registration
+where first_enc_date IS NULL
+and registration_date >= '2024-01-01' 
+and registration_date < '2026-12-31'
+and patient_activeflag = 'Y';
+
+SELECT DISTINCT patient_activeflag from reporting_tncpa.registration;
+
+SELECT count(patient_id) FROM reporting_tncpa.registration
+where first_enc_date is not null;
+
+
+SELECT
+    COUNT(CASE WHEN first_enc_date IS NOT NULL THEN patient_id END) * 100.0
+        / COUNT(patient_id) AS pct_patients_with_encounter
+FROM reporting_tncpa.registration;
+
+-- registration to first encounter
+SELECT
+    COUNT(patient_id) AS registered_patients,
+    COUNT(CASE WHEN first_enc_date IS NOT NULL THEN patient_id END) AS patients_with_encounter,
+    COUNT(CASE WHEN first_enc_date IS NOT NULL THEN patient_id END) * 100.0
+        / COUNT(patient_id) AS pct_patients_with_encounter
+FROM reporting_tncpa.registration
+where registration_date >= '2024-01-01'
+and registration_date < '2026-12-31'
+and patient_activeflag = 'Y';
+
+SELECT
+    COUNT(CASE WHEN first_enc_date IS NULL THEN patient_id END) AS patients_no_encounter,
+    COUNT(patient_id) AS total_registered,
+    COUNT(CASE WHEN first_enc_date IS NULL THEN patient_id END) * 100.0
+        / COUNT(patient_id) AS pct_no_encounter
+FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+AND registration_date >= '2024-01-01' 
+and registration_date < '2026-12-31';
+
+
+
+-- same day reg and first_enc
+SELECT 
+COUNT(CASE WHEN registration_date = first_enc_date THEN patient_id END)* 100.0
+/COUNT(CASE WHEN FIRST_ENC_DATE IS NOT NULL THEN patient_id END) AS same_day_registration
+from reporting_tncpa.registration
+where patient_activeflag = 'Y'
+AND registration_date >= '2024-01-01' 
+and registration_date < '2026-12-31';
+
+-- DAILY AVERAGE
+WITH daily AS (
+    SELECT
+        CAST(registration_date AS DATE) AS reg_day,
+        COUNT(patient_id) AS daily_registrations
+    FROM reporting_tncpa.registration
+    where patient_activeflag = 'Y'
+   AND registration_date >= '2024-01-01' 
+and registration_date < '2026-12-31'
+    GROUP BY CAST(registration_date AS DATE)
+)
+SELECT
+    SUM(daily_registrations) AS total_registrations,
+    COUNT(*) AS days_counted,
+    ROUND(AVG(daily_registrations), 1) AS avg_daily_registrations,
+    ROUND(STDDEV_SAMP(daily_registrations), 1) AS stddev_daily_registrations,
+    MAX(daily_registrations) AS peak_single_day
+FROM DAILY;
+
+
+-- deceased
+SELECT COUNT(DISTINCT patient_id) FROM reporting_tncpa.registration
+where deceased_status = 'Y'
+and date_of_death is not null
+and patient_activeflag = 'Y'
+and registration_date >= '2024-01-01'
+and registration_date < '2026-12-31';
+
+-- avg_days_to_first_enc
+SELECT
+    AVG(DATEDIFF(first_enc_date, registration_date)) AS avg_days_to_first_enc
+FROM reporting_tncpa.registration
+WHERE first_enc_date IS NOT NULL
+  AND first_enc_date >= registration_date
+  and registration_date >= '2024-01-01'
+  and registration_date < '2026-12-31';
+
+-- gender distribution
+SELECT 
+COUNT(CASE WHEN gender = 'M' THEN patient_id END) AS male,
+COUNT(CASE WHEN gender = 'F' THEN patient_id end) as female,
+COUNT(CASE when gender is null THEN patient_id END) AS unknownn
+FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+and registration_date >= '2024-01-01'
+and registration_date < '2026-12-31';
+
+
+
+
+SELECT * FROM reporting_tncpa.registration;
+
+
+-- race
+SELECT race_grouped, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+group by race_grouped
+order by countss desc;
+
+
+-- race
+Select r.race_grouped, count(distinct patient_id) as countss from reporting_tncpa.registration r
+left join reporting_tncpa.patient_information i
+on r.patient_id = i.patientid
+where -- i.patientstatus = 'Pending' -- or 
+i.patientstatus = 'Deleted'
+and r.registration_date >= '2024-01-01'
+and r.registration_date < '2026-12-31'
+group by r.race_grouped
+order by countss desc;
+
+
+SELECT * FROM reporting_tncpa.registration;
+
+-- ethnicity wiht  deleted/inactive/pending patient status
+SELECT ethnicity, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration r
+join reporting_tncpa.patient_information i
+on r.patient_id = i.patientid
+where i.patientstatus = 'Pending' or i.patientstatus = 'Deleted'
+and r.registration_date >= '2024-01-01'
+and r.registration_date < '2026-12-31'
+group by ethnicity
+order by countss desc;
+
+
+-- ethnicity 
+select ethnicity, count(distinct patient_id) as countss from reporting_tncpa.registration r
+where patient_activeflag = 'Y'
+and r.registration_date >= '2024-01-01'
+and r.registration_date < '2026-12-31'
+group by ethnicity
+order by countss desc
+
+-- marital_status
+SELECT marital_Status, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration 
+where patient_activeflag = 'Y'
+group by marital_status
+order by countss desc;
+
+-- primary language
+SELECT primary_language, COUNT(distinct patient_id) as countss FROM reporting_tncpa.registration r
+join reporting_tncpa.patient_information i
+on r.patient_id = i.patientid
+where i.patientstatus = 'Inactive'
+and r.registration_date >= '2024-01-01'
+and r.registration_date < '2026-12-31'
+group by primary_language
+order by countss desc;
+
+SELECT primary_language, COUNT(*) as countss FROM reporting_tncpa.registration r
+ join reporting_tncpa.patient_information i
+on r.patient_id = i.patientid
+where i.patientstatus = 'Inactive'
+group by primary_language
+order by countss desc;
+
+-- encounter group with active patient status
+SELECT visit_type_grouped, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+group by visit_type_grouped
+order by countss desc;
+
+-- encounter group with inactive/deleted/pending status
+SELECT visit_type_grouped, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration r
+left join reporting_tncpa.patient_information i
+on r.patient_id = i.patientid
+where i.patientstatus = 'Deleted'
+group by visit_type_grouped
+order by countss desc;
+
+-- provider and active patient status
+SELECT provider, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration
+left join reporting_tncpa.patient_information i 
+on r.patient_id = i.patientid
+where -- patient_activeflag = 'Y'
+registration_date >= '2024-01-01'
+and registration_date < '2026-12-31'
+group by provider
+order by countss desc;
+
+-- provider with inactive/deleted/pending
+SELECT provider, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration r
+left join reporting_tncpa.patient_information i 
+on r.patient_id = i.patientid
+where -- patient_activeflag = 'Y'
+registration_date >= '2024-01-01'
+and registration_date < '2026-12-31'
+and i.patientstatus = 'Deleted'
+group by provider
+order by countss desc;
+
+
+
+
+
+-- speciality
+SELECT specialty, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+group by specialty
+order by countss desc;
+
+
+-- insurance/payer
+SELECT insurance, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+AND registration_date >= '2024-009-01' 
+and registration_date < '2026-01-31'
+group by insurance
+order by countss desc;
+
+-- zipcode
+SELECT zip_code, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+group by zip_code
+order by countss desc;
+SELECT COUNT(DISTINCT ZIP_CODE) FROM reporting_tncpa.REGISTRATION
+where patient_activeflag = 'Y'
+
+-- city
+SELECT city, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+group by city
+order by countss desc;
+SELECT COUNT(DISTINCT CITY) FROM reporting_tncpa.registration
+
+-- state
+SELECT state, COUNT(DISTINCT patient_id) as countss FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+group by state
+order by countss desc;
+
+
+
+
+SELECT patient_id FROM reporting_tncpa.registration where
+
+SELECT * FROM reporting_tncpa.registration
+where patient_id = 
+
+SELECT * FROM reporting_tncpa.registration
+where -- patient_activeflag = 'N' and 
+patient_id = 
+and registration_date >= '2026-01-01'
+and registration_date < '2026-12-31'
+
+
+SELECT * FROM reporting_tncpa.registration
+where first_enc_date IS null
+AND registration_date >= '2022-01-01' 
+and registration_date < '2026-12-31'
+and patient_activeflag = 'N'
+and first_enc_date is null
+
+
+
+SELECT * FROM reporting_tncpa.patient_information
+
+SELect COUNT(DISTINCT patient_id) FROM reporting_tncpa.registration r
+left join reporting_tncpa.patient_information i
+on r.patient_id = i.patientid
+where patientstatus = 'Deleted'
+and registrationdate >= '2024-01-01'
+and registrationdate < '2026-12-31'
+and r.deceased_status = 'Y'
+and r.date_of_death is not null
+
+-- daily average for pending/inactive/deleted patientstatus, change status as per requirement
+SELECT 
+round(avg(n),1) as avg_daily_registrations,
+max(n) as peak_single_day,
+round(stddev_samp(n),1) as stddev_daily_registrations
+FROM (
+Select cast(r.registration_date as date) as reg_day,
+count(r.patient_id) as n
+from reporting_tncpa.registration r
+join reporting_tncpa.patient_information i
+on r.patient_id = i.patientid
+where i.patientstatus = 'Pending'
+and r.registration_date >= '2024-01-01'
+and r.registration_date < '2027-01-01'
+group by 1)d
+
+
+
+
+
+
+
+-- active deceased
+SELECT COUNT(DISTINCT patient_id) FROM reporting_tncpa.registration
+where deceased_status = 'Y'
+and date_of_death is not null
+and patient_activeflag = 'Y'
+and registration_date >= '2024-01-01'
+and registration_date < '2026-12-31';
+
+-- aactive avg_days_to_first_enc
+SELECT
+    AVG(DATEDIFF(first_enc_date, registration_date)) AS avg_days_to_first_enc
+FROM reporting_tncpa.registration
+WHERE first_enc_date IS NOT NULL
+  AND first_enc_date >= registration_date
+  and registration_date >= '2024-01-01'
+  and registration_date < '2026-12-31';
+
+
+
+-- DAILY AVERAGE
+WITH daily AS (
+    SELECT
+        CAST(registration_date AS DATE) AS reg_day,
+        COUNT(patient_id) AS daily_registrations
+    FROM reporting_tncpa.registration
+    where patient_activeflag = 'Y'
+   AND registration_date >= '2024-01-01' 
+and registration_date < '2026-12-31'
+    GROUP BY CAST(registration_date AS DATE)
+)
+SELECT
+    SUM(daily_registrations) AS total_registrations,
+    COUNT(*) AS days_counted,
+    ROUND(AVG(daily_registrations), 1) AS avg_daily_registrations,
+    ROUND(STDDEV_SAMP(daily_registrations), 1) AS stddev_daily_registrations,
+    MAX(daily_registrations) AS peak_single_day
+FROM DAILY;
+
+
+
+
+SELECT 
+COUNT(CASE WHEN r.gender = 'M' THEN patient_id END) AS male,
+COUNT(CASE WHEN r.gender = 'F' THEN patient_id end) as female,
+COUNT(CASE when r.gender is null THEN patient_id END) AS unknownn
+from reporting_tncpa.registration r
+left join reporting_tncpa.patient_information i
+on r.patient_id = i.patientid
+where -- i.patientstatus = 'Deleted' or 
+i.patientstatus = 'Pending'
+and registration_date >= '2024-01-01'
+and registration_date < '2026-12-31';
+
+
+
+
+SELECT 
+COUNT(CASE WHEN gender = 'M' THEN patient_id END) AS male,
+COUNT(CASE WHEN gender = 'F' THEN patient_id end) as female,
+COUNT(CASE when gender is null THEN patient_id END) AS unknownn
+FROM reporting_tncpa.registration
+where patient_activeflag = 'Y'
+and registration_date >= '2024-01-01'
+and registration_date < '2026-12-31';
