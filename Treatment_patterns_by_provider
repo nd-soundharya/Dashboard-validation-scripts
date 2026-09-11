@@ -1,0 +1,53 @@
+-- Treatmnt by provider validation
+select * from reporting_tng.Document_all;
+
+-- total encounters
+Select count(distinct CLINICALENCOUNTERID) from reporting_tng.Document_all;
+
+-- total patients
+Select count(distinct PATIENTID) from reporting_tng.Document_all;
+ 
+-- % started on therapy
+WITH cohort AS (
+    SELECT DISTINCT patientid
+    FROM reporting_tng.DOCUMENT_ALL),
+    
+    therapy_patients AS (
+    SELECT DISTINCT patientid
+    FROM reporting_tng.patient_cpt_v3
+    WHERE code LIKE 'J%')
+    
+    SELECT
+    (SELECT COUNT(*) FROM cohort)                                   AS patients_in_cohort,
+    (SELECT COUNT(*) FROM therapy_patients tp
+        JOIN cohort c ON c.patientid = tp.patientid)                AS therapy_patients,
+    ROUND(
+        (SELECT COUNT(*) FROM therapy_patients tp JOIN cohort c ON c.patientid = tp.patientid) * 100.0
+        / NULLIF((SELECT COUNT(*) FROM cohort), 0)
+    , 0)                                                              AS pct_started_on_therapy;
+    
+    -- Avg Treatment rate
+    WITH cohort AS (
+    SELECT DISTINCT patientid
+    FROM reporting_tng.DOCUMENT_ALL
+    -- WHERE ENCOUNTERDATE BETWEEN @dateStart AND @dateEnd
+    --  AND (@provider      IS NULL OR PROVIDERNAME     = @provider)
+    --  AND (@diagnosisCode IS NULL OR DIAGNOSISCODE    = @diagnosisCode)
+),
+rx_patients AS (
+    SELECT DISTINCT patientid
+    FROM reporting_tng.DOCUMENT_ALL
+    WHERE DOCUMENTCLASS = 'PRESCRIPTION'
+    --  AND ENCOUNTERDATE BETWEEN @dateStart AND @dateEnd
+    --  AND (@provider      IS NULL OR PROVIDERNAME     = @provider)
+    --  AND (@diagnosisCode IS NULL OR DIAGNOSISCODE    = @diagnosisCode)
+)
+SELECT
+    (SELECT COUNT(*) FROM cohort)                                     AS patients_in_cohort,
+    (SELECT COUNT(*) FROM rx_patients rp JOIN cohort c ON c.patientid = rp.patientid)
+                                                                        AS rx_patients,
+    ROUND(
+        (SELECT COUNT(*) FROM rx_patients rp JOIN cohort c ON c.patientid = rp.patientid) * 100.0
+        / NULLIF((SELECT COUNT(*) FROM cohort), 0)
+    , 0)                                                                AS avg_treatment_rate_pct;
+
