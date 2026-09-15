@@ -80,3 +80,80 @@ WHERE pu.PATIENTID IS NOT NULL
   -- AND pu.APPOINTMENTDATE <  ''
 GROUP BY pu.visit_type_grouped
 ORDER BY appt_count DESC;
+
+
+-- providers KPI
+WITH flagged AS (
+    SELECT
+        pu.SCHEDULINGPROVIDER,
+        pu.APPOINTMENTID,
+        CASE
+            -- FROZEN (your logic: patient must be attached)
+            WHEN COALESCE(pu.FROZENYN,'N') = 'Y'
+             AND pu.PATIENTID IS NOT NULL
+                THEN 'FROZEN'
+
+            WHEN pu.PATIENTID IS NULL
+                THEN 'OTHER'
+
+            -- COMPLETED
+            WHEN pu.APPOINTMENTSTATUS IN ('4 - Charge Entered',
+                                          '3 - Checked Out',
+                                          '2 - Checked In',
+                                          'f - Filled')
+                THEN 'COMPLETED'
+
+            -- NO SHOW
+            WHEN pu.APPOINTMENTSTATUS = 'x - Cancelled'
+             AND (UPPER(COALESCE(pu.APPOINTMENTCANCELREASON,'')) LIKE '%NO SHOW%'
+               OR UPPER(COALESCE(pu.APPOINTMENTCANCELREASON,'')) LIKE '%CANCELLED LESS THAN 24 HOURS%')
+                THEN 'NO_SHOW'
+
+            -- CANCELLED (everything else cancelled, minus telemed deletions)
+            WHEN pu.APPOINTMENTSTATUS = 'x - Cancelled'
+             AND UPPER(COALESCE(pu.APPOINTMENTCANCELREASON,''))
+                 <> 'ENCOUNTER DELETED PT NOT SEEN - TELEMED'
+                THEN 'CANCELLED'
+
+            ELSE 'OTHER'
+        END AS APPT_BUCKET
+    FROM reporting_tncpa.PROVIDER_UTILIZATION pu
+    WHERE pu.APPOINTMENTID IS NOT NULL
+      AND UPPER(COALESCE(pu.APPOINTMENTCANCELREASON,'')) <> 'SCHEDULING ERROR'
+      AND NOT EXISTS (
+            SELECT 1
+            FROM reporting_tncpa.REGISTRATION r
+            WHERE r.patient_id = pu.PATIENTID
+              AND r.last_name  = 'TESTPATIENT'
+          )
+    --  AND pu.SCHEDULINGPROVIDER = '<provider>'
+     -- AND pu.APPOINTMENTDATE >= DATE '2026-09-01'
+     -- AND pu.APPOINTMENTDATE <  DATE '2026-10-01'
+      -- single day instead: AND pu.APPOINTMENTDATE = DATE '2026-09-15'
+),
+
+per_appt AS (
+    SELECT
+        APPOINTMENTID,
+        MIN(SCHEDULINGPROVIDER) AS SCHEDULINGPROVIDER,
+        MIN(CASE APPT_BUCKET
+                 WHEN 'FROZEN'    THEN 1
+                 WHEN 'NO_SHOW'   THEN 2
+                 WHEN 'CANCELLED' THEN 3
+                 WHEN 'COMPLETED' THEN 4
+                 ELSE 5 END) AS bucket_rank
+    FROM flagged
+    GROUP BY APPOINTMENTID
+)
+
+SELECT
+    SCHEDULINGPROVIDER,
+    COUNT(*)                                          AS total_appointments,
+    SUM(CASE WHEN bucket_rank = 4 THEN 1 ELSE 0 END)  AS completed,
+    SUM(CASE WHEN bucket_rank = 3 THEN 1 ELSE 0 END)  AS cancelled,
+    SUM(CASE WHEN bucket_rank = 2 THEN 1 ELSE 0 END)  AS no_shows,
+    SUM(CASE WHEN bucket_rank = 1 THEN 1 ELSE 0 END)  AS frozen
+FROM per_appt
+WHERE bucket_rank <> 5
+GROUP BY SCHEDULINGPROVIDER
+ORDER BY total_appointments DESC;
