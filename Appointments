@@ -90,7 +90,6 @@ WITH flagged AS (
         CASE
             -- FROZEN (your logic: patient must be attached)
             WHEN COALESCE(pu.FROZENYN,'N') = 'Y'
-             AND pu.PATIENTID IS NOT NULL
                 THEN 'FROZEN'
 
             WHEN pu.PATIENTID IS NULL
