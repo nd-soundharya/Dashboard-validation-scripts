@@ -57,3 +57,26 @@ where PATIENTID IS NOT NULL
   AND PATIENTID NOT IN (SELECT patient_id FROM reporting_tng.REGISTRATION WHERE last_name = 'TESTPATIENT')
   group by APPOINTMENTCANCELREASON;
 
+
+-- appointment group distribution
+SELECT
+    pu.visit_type_grouped,
+    COUNT(DISTINCT pu.APPOINTMENTID) AS appt_count
+FROM reporting_TNCPA.provider_utilization pu
+LEFT JOIN (
+        SELECT DISTINCT patient_id
+        FROM reporting_TNCPA.REGISTRATION
+        WHERE last_name = 'TESTPATIENT' AND patient_id IS NOT NULL
+     ) tp
+  ON pu.PATIENTID = tp.patient_id
+WHERE pu.PATIENTID IS NOT NULL
+  AND pu.APPOINTMENTID IS NOT NULL
+  AND COALESCE(pu.APPOINTMENTCANCELREASON,'') <> 'SCHEDULING ERROR'
+  AND tp.patient_id IS NULL
+   -- AND pu.SCHEDULINGPROVIDER = ''      -- <<< provider
+   -- AND pu.APPOINTMENTDATE    =  ''         -- <<< single date
+  -- For a range instead, comment the line above and use:
+  -- AND pu.APPOINTMENTDATE >= ''
+  -- AND pu.APPOINTMENTDATE <  ''
+GROUP BY pu.visit_type_grouped
+ORDER BY appt_count DESC;
